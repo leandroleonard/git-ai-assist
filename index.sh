@@ -83,6 +83,11 @@ setup_project(){
         fi
         echo "AUTO_COMMIT=$auto_commit" >> "$CURRENT_CONFIG_FILE"
 
+        read -p "Add in .gitignore? (y/n): " git_ignore_config
+        if [[ "$git_ignore_config" == "y" ]]; then
+            echo ".git-ai-assist/" >> .gitignore
+        fi
+
         echo -e "${GREEN}Config saved in $CURRENT_CONFIG_FILE${NC}"
     else
         echo -e "${YELLOW}Config already exists ${NC}"
