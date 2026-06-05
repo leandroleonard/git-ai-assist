@@ -123,9 +123,22 @@ commit (){
 
 see_alt (){
     check_project_initialized
-    # Implementar lógica para apresentar as mudanças realizadas
-    git status --short
-    git diff HEAD
+    
+    git add -N .
+
+    modified_files=$(git diff --name-only)
+
+    new_files=$(git ls-files --others --exclude-standard)
+
+    for file in $modified_files; do
+        echo "===== $file ====="
+        git diff HEAD -- "$file"
+    done
+
+    for file in $new_files; do
+        echo "===== NEW FILE: $file ====="
+        cat "$file"
+    done
     
 }
 
