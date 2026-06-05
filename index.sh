@@ -126,25 +126,52 @@ commit (){
     check_project_initialized
 }
 
-see_alt (){
+see_alt() {
     check_project_initialized
-    
-    git add -N .
 
-    modified_files=$(git diff --name-only)
+    git add -N . >/dev/null 2>&1
 
-    new_files=$(git ls-files --others --exclude-standard)
+    local tmp_file=$(mktemp)
 
-    for file in $modified_files; do
-        echo "===== $file ====="
-        git diff HEAD -- "$file"
-    done
+    cat > "$tmp_file" <<EOF
+        # GIT STATUS
+        $(git status --short)
+        # CHANGES
+EOF
 
-    for file in $new_files; do
-        echo "===== NEW FILE: $file ====="
-        cat "$file"
-    done
-    
+    while IFS= read -r file; do
+
+        case "$file" in
+            package-lock.json|yarn.lock|composer.lock|*.log|*.zip|*.gz|*.jpg|*.jpeg|*.png|*.gif|*.pdf)
+                continue
+                ;;
+        esac
+
+        echo "" >> "$tmp_file"
+        echo "===== FILE: $file =====" >> "$tmp_file"
+
+        git diff HEAD -- "$file" >> "$tmp_file"
+
+    done < <(git diff --name-only HEAD)
+
+    while IFS= read -r file; do
+
+        case "$file" in
+            package-lock.json|yarn.lock|composer.lock|*.log|*.zip|*.gz|*.jpg|*.jpeg|*.png|*.gif|*.pdf)
+                continue
+                ;;
+        esac
+
+        echo "" >> "$tmp_file"
+        echo "===== NEW FILE: $file =====" >> "$tmp_file"
+
+        head -n 100 "$file" >> "$tmp_file"
+
+    done < <(git ls-files --others --exclude-standard)
+
+    cat "$tmp_file"
+
+    rm -f "$tmp_file"
 }
 
 main() {
