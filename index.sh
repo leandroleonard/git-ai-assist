@@ -28,9 +28,8 @@ setup_config() {
         echo -e "${YELLOW}Initial config required ${NC}"
         echo "Choice your LLM:"
         echo "1) OpenAI (GPT-4/GPT-3.5)"
-        echo "2) Anthropic Claude"
-        echo "3) Google Gemini"
-        read -p "Option (1-3): " llm_choice
+        echo "2) Grok"
+        read -p "Option (1-2): " llm_choice
 
         case $llm_choice in
             1)
@@ -40,19 +39,13 @@ setup_config() {
                 echo "OPENAI_MODEL=gpt-4" >> "$CONFIG_FILE"
                 ;;
             2)
-                # read -p "API Key Anthropic: " api_key
-                # echo "LLM_TYPE=anthropic" > "$CONFIG_FILE"
-                # echo "ANTHROPIC_API_KEY=$api_key" >> "$CONFIG_FILE"
-                echo "Unavailable in this version"
-                ;;
-            3)
-                # read -p "API Key Google: " api_key
-                # echo "LLM_TYPE=google" > "$CONFIG_FILE"
-                # echo "GOOGLE_API_KEY=$api_key" >> "$CONFIG_FILE"
-                echo "Unavailable in this version"
+                read -p "API Key Grok: " api_key
+                echo "LLM_TYPE=grok" > "$CONFIG_FILE"
+                echo "GROK_API_KEY=$api_key" >> "$CONFIG_FILE"
+    
                 ;;
         esac
-        
+                
         echo -e "${GREEN}Config saved in $CONFIG_FILE${NC}"
     fi
 
@@ -177,19 +170,45 @@ EOF
     rm -f "$tmp_file"
 }
 
+git_commit(){
+    local message="$1"
+
+    git add .
+    git commit -m "$(echo "$response" | sed 's/"/\\"/g')"
+    echo -e "${GREEN}Changes committed with message: $message ${NC}"
+}
+
+
 call_llm(){
     local prompt="$1"
     local response=""
 
-    response=$(curl -s https://api.openai.com/v1/chat/completions \
+        response=$(curl -s https://api.groq.com/openai/v1/chat/completions \
         -H "Content-Type: application/json" \
-        -H "Authorization: Bearer $OPENAI_API_KEY" \
+        -H "Authorization: Bearer $GROQ_API_KEY" \
         -d "{
-            \"model\": \"$OPENAI_MODEL\",
+            \"model\": \"llama-3.3-70b-versatile\",
             \"messages\": [{\"role\": \"user\", \"content\": \"$prompt\"}],
-            \"temperature\": 0.7
+            \"temperature\": 0.7,
+            \"max_tokens\": 200
         }" | jq -r '.choices[0].message.content')
+    
 
+    if [ -z "$response" ] || [ "$response" = "null" ]; then
+        echo -e "${RED} Error: Empty response from API. Verify your API key and connection.${NC}"
+        return 1
+    fi
+
+
+    if [ $AUTO_COMMIT == "true" ]; then
+        git_commit "$response"
+    else
+        echo -e "Do you want to commit with this message? ${YELLOW}$response${NC} (y/n)"
+        read -p "" confirm
+        if [[ "$confirm" == "y" ]]; then
+            git_commit "$response"
+        fi
+    fi
 }
 
 generate_commit_message() {
@@ -256,6 +275,16 @@ main() {
             ;;
         see-alt)
             see_alt
+            ;;
+        gen-commit)
+            changes=$(see_alt)
+            echo "Do you want to add a custom note to the LLM? (y/n)"
+            read -p "" add_note
+            if [[ "$add_note" == "y" ]]; then
+                echo "Type your note:"
+                read -p "" custom_note
+            fi
+            generate_commit_message "$changes" "$custom_note"
             ;;
         *)
             echo -e "${RED}Erro: comando ou opção '$1' não existe.${NC}"
