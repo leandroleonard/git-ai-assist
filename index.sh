@@ -55,6 +55,9 @@ setup_config() {
         
         echo -e "${GREEN}Config saved in $CONFIG_FILE${NC}"
     fi
+
+    source "$CONFIG_FILE"
+    source "$CURRENT_CONFIG_FILE"
 }
 
 check_git_repository() {
@@ -172,6 +175,51 @@ EOF
     cat "$tmp_file"
 
     rm -f "$tmp_file"
+}
+
+call_llm(){
+    local prompt="$1"
+    local response=""
+
+    response=$(curl -s https://api.openai.com/v1/chat/completions \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer $OPENAI_API_KEY" \
+        -d "{
+            \"model\": \"$OPENAI_MODEL\",
+            \"messages\": [{\"role\": \"user\", \"content\": \"$prompt\"}],
+            \"temperature\": 0.7
+        }" | jq -r '.choices[0].message.content')
+
+}
+
+generate_commit_message() {
+    check_project_initialized
+
+    local changes="$1"
+    local custom_note="$2"
+
+    local prompt="
+You are a specialized assistant in generating Git commit messages based on code changes.
+
+Analyze the following changes and generate a commit message following these rules:
+
+1. Use the conventional format: type(scope): description
+2. Types: feat, fix, docs, style, refactor, test, chore
+3. Be specific and descriptive
+4. Maximum 72 characters on the first line
+5. Add explanatory body if necessary (no more than 3 lines)
+6. Be in Portuguese
+
+CHANGES:
+
+$changes
+
+$([ -n "$custom_note" ] && echo "USER NOTE: $custom_note")
+
+Generate ONLY the commit message, without additional explanations.
+"
+
+call_llm "$prompt"
 }
 
 main() {
