@@ -262,8 +262,6 @@ call_llm() {
     tmp_response=$(mktemp)
     trap "rm -f '$tmp_response'" EXIT
 
-    echo -e "${CYAN}Calling ${LLM_TYPE} (${LLM_MODEL})...${NC}"
-
     http_code=$(curl -s -w "%{http_code}" -o "$tmp_response" \
         "$LLM_API_URL" \
         -H "Content-Type: application/json" \
