@@ -207,18 +207,31 @@ check_project_initialized() {
 # ===========================
 see_alt() {
     check_project_initialized
+    
+    local has_changes=false
+    
+    if git diff --name-only HEAD 2>/dev/null | grep -q .; then
+        has_changes=true
+    fi
+    
+    if [ "$has_changes" = false ] && git ls-files --others --exclude-standard 2>/dev/null | grep -q .; then
+        has_changes=true
+    fi
+    
+    if [ "$has_changes" = false ]; then
+        echo -e "${YELLOW}No changes detected in the repository. Nothing to show.${NC}" >&2
+        return 0
+    fi
 
     local tmp_file
     tmp_file=$(mktemp)
     trap "rm -f '$tmp_file'" EXIT
 
-    # Header
     echo "# GIT STATUS" >> "$tmp_file"
     git status --short >> "$tmp_file"
     echo "" >> "$tmp_file"
     echo "# DIFFS" >> "$tmp_file"
 
-    # Changed files
     while IFS= read -r file; do
         case "$file" in
             package-lock.json|yarn.lock|composer.lock|*.log|*.zip|*.gz|*.jpg|*.jpeg|*.png|*.gif|*.pdf|*.svg|*.ico)
@@ -233,7 +246,6 @@ see_alt() {
 
     done < <(git diff --name-only HEAD 2>/dev/null)
 
-    # New untracked files
     while IFS= read -r file; do
         case "$file" in
             package-lock.json|yarn.lock|composer.lock|*.log|*.zip|*.gz|*.jpg|*.jpeg|*.png|*.gif|*.pdf|*.svg|*.ico)
@@ -318,6 +330,11 @@ generate_commit_message() {
     local changes="$1"
     local custom_note="${2:-}"
 
+    if [ -z "$changes" ] || [[ "$changes" =~ ^[[:space:]]*$ ]]; then
+        echo -e "${YELLOW}No changes detected. Nothing to commit.${NC}"
+        return 0
+    fi
+
     local prompt="You are a specialized assistant in generating Git commit messages based on code changes.
 
 Analyze the following changes and generate a commit message following these rules:
@@ -363,6 +380,12 @@ generate_report() {
 
     local changes="$1"
     local custom_note="${2:-}"
+
+    if [ -z "$changes" ] || [[ "$changes" =~ ^[[:space:]]*$ ]]; then
+        echo -e "${YELLOW}No changes detected. Nothing to generate report for.${NC}"
+        return 0
+    fi
+
     local today
     today=$(date '+%d/%m/%Y')
 
@@ -411,7 +434,6 @@ Generate the report in the format above, without additional explanations or mark
     echo -e "${BLUE}═══════════════════════════════════════════════════${NC}"
     echo ""
 
-    # Ask if user wants to copy to clipboard
     if command -v xclip &>/dev/null; then
         read -rp "Copy to clipboard? (y/n) [y]: " copy_clip
         if [[ "$copy_clip" != "n" && "$copy_clip" != "N" ]]; then
@@ -426,7 +448,6 @@ Generate the report in the format above, without additional explanations or mark
         fi
     fi
 
-    # Ask if user wants to save to file
     read -rp "Save report to file? (y/n) [n]: " save_file
     if [[ "$save_file" == "y" || "$save_file" == "Y" ]]; then
         local report_file="daily-report-${today//\//_}.md"
