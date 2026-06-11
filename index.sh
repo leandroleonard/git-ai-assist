@@ -329,7 +329,7 @@ Analyze the following changes and generate a commit message following these rule
 3. Be specific and descriptive
 4. Maximum 72 characters on the first line
 5. Add explanatory body if necessary (no more than 3 lines)
-6. Be in Portuguese (Brazilian)
+
 
 CHANGES:
 $changes
@@ -368,25 +368,25 @@ generate_report() {
     local today
     today=$(date '+%d/%m/%Y')
 
-    local prompt="Você é um desenvolvedor experiente criando um relatório diário de trabalho.
+    local prompt="You are an experienced developer creating a daily work report.
 
-Baseado nas alterações de código abaixo, gere um resumo profissional do que foi feito hoje.
-O relatório deve:
+Based on the code changes below, generate a professional summary of what was done today.
 
-1. Ser em português (brasileiro)
-2. Começar com um parágrafo executivo resumindo as principais entregas
-3. Listar as principais tarefas realizadas (use marcadores)
-4. Mencionar arquivos/chaves importantes modificadas
-5. Ser otimista e profissional
-6. Adicionar seção de próximos passos se aplicável
-7. Tom: profissional mas humano
+The report should:
 
-ALTERAÇÕES:
+1. Be in Brazilian Portuguese
+2. Begin with a short executive paragraph summarizing the main deliverables
+3. List the main tasks performed (use bullet points)
+4. Mention important files/keys modified
+5. Be professional, short, and objective
+6. Tone: professional but human
+
+CHANGES:
 $changes
 $([ -n "$custom_note" ] && echo "
-OBSERVAÇÃO ADICIONAL: $custom_note")
+ADDITIONAL NOTE: $custom_note")
 
-Formato de saída:
+Output format:
 ${today} - Resumo do dia
 =====================
 
@@ -401,10 +401,7 @@ Arquivos modificados importantes:
 • [arquivo 1]
 ...
 
-Próximos passos (se houver):
-• [próximo passo]
-
-Gere o relatório no formato acima, sem explicações adicionais ou markdown."
+Generate the report in the format above, without additional explanations or markdown."
 
     echo -e "${CYAN}Generating daily report...${NC}"
     local response
