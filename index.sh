@@ -2,6 +2,8 @@
 
 # ~/bin/git-ai-assist.sh
 # Git AI Assistant - Automação Inteligente para Git
+# Version: 1.0.0
+# License: MIT
 
 set -euo pipefail
 
@@ -26,7 +28,7 @@ HISTORY_FILE="$CONFIG_DIR/history.log"
 
 CURRENT_DIR="$(pwd)"
 CURRENT_CONFIG_DIR="$CURRENT_DIR/.git-ai-assist"
-CURRENT_CONFIG_FILE="$CURRENT_CONFIG_DIR/config.env"
+CURRENT_CONFIG_FILE="$CURRENT_DIR/.git-ai-assist/config.env"
 
 # ===========================
 # Defaults
@@ -56,6 +58,17 @@ log_history() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') | $1" >> "$HISTORY_FILE"
 }
 
+
+json_escape() {
+    local input="$1"
+    input="${input//\\/\\\\}"       
+    input="${input//\"/\\\"}"       
+    input="${input//$'\n'/\\n}"     
+    input="${input//$'\t'/\\t}"     
+    input="${input//$'\r'/\\r}"     
+    printf '%s' "$input"
+}
+
 # ===========================
 # Setup config
 # ===========================
@@ -74,33 +87,40 @@ setup_config() {
         case $llm_choice in
             1)
                 read -rp "Enter your Groq API Key: " api_key
-                echo "LLM_TYPE=groq" > "$CONFIG_FILE"
-                echo "GROQ_API_KEY=$api_key" >> "$CONFIG_FILE"
-                echo "LLM_MODEL=$DEFAULT_MODEL" >> "$CONFIG_FILE"
-                echo "LLM_API_URL=https://api.groq.com/openai/v1/chat/completions" >> "$CONFIG_FILE"
+                {
+                    echo "LLM_TYPE=groq"
+                    echo "GROQ_API_KEY=$api_key"
+                    echo "LLM_MODEL=$DEFAULT_MODEL"
+                    echo "LLM_API_URL=https://api.groq.com/openai/v1/chat/completions"
+                } > "$CONFIG_FILE"
                 ;;
             2)
                 read -rp "Enter your OpenAI API Key: " api_key
                 read -rp "Enter model name [gpt-4o]: " model
                 model="${model:-gpt-4o}"
-                echo "LLM_TYPE=openai" > "$CONFIG_FILE"
-                echo "OPENAI_API_KEY=$api_key" >> "$CONFIG_FILE"
-                echo "LLM_MODEL=$model" >> "$CONFIG_FILE"
-                echo "LLM_API_URL=https://api.openai.com/v1/chat/completions" >> "$CONFIG_FILE"
+                {
+                    echo "LLM_TYPE=openai"
+                    echo "OPENAI_API_KEY=$api_key"
+                    echo "LLM_MODEL=$model"
+                    echo "LLM_API_URL=https://api.openai.com/v1/chat/completions"
+                } > "$CONFIG_FILE"
                 ;;
             3)
                 read -rp "Enter your xAI Grok API Key: " api_key
                 read -rp "Enter model name [grok-2-latest]: " model
                 model="${model:-grok-2-latest}"
-                echo "LLM_TYPE=grok" > "$CONFIG_FILE"
-                echo "GROK_API_KEY=$api_key" >> "$CONFIG_FILE"
-                echo "LLM_MODEL=$model" >> "$CONFIG_FILE"
-                echo "LLM_API_URL=https://api.x.ai/v1/chat/completions" >> "$CONFIG_FILE"
+                {
+                    echo "LLM_TYPE=grok"
+                    echo "GROK_API_KEY=$api_key"
+                    echo "LLM_MODEL=$model"
+                    echo "LLM_API_URL=https://api.x.ai/v1/chat/completions"
+                } > "$CONFIG_FILE"
                 ;;
             *)
                 die "Invalid option."
                 ;;
         esac
+        chmod 600 "$CONFIG_FILE"
         echo -e "${GREEN}Config saved in $CONFIG_FILE${NC}"
     fi
 
@@ -112,8 +132,7 @@ setup_config() {
         source "$CURRENT_CONFIG_FILE"
     fi
 
-    # Validate API key exists
-    case "$LLM_TYPE" in
+    case "${LLM_TYPE:-}" in
         groq)
             [ -z "${GROQ_API_KEY:-}" ] && die "GROQ_API_KEY not set in $CONFIG_FILE"
             API_KEY="$GROQ_API_KEY"
@@ -127,11 +146,10 @@ setup_config() {
             API_KEY="$GROK_API_KEY"
             ;;
         *)
-            die "Unknown LLM_TYPE: $LLM_TYPE. Supported: groq, openai, grok"
+            die "Unknown LLM_TYPE: ${LLM_TYPE:-not set}. Supported: groq, openai, grok"
             ;;
     esac
 
-    # Set defaults if not configured
     LLM_MODEL="${LLM_MODEL:-$DEFAULT_MODEL}"
     LLM_API_URL="${LLM_API_URL:-https://api.groq.com/openai/v1/chat/completions}"
 }
@@ -166,7 +184,6 @@ setup_project() {
 
         read -rp "Add .git-ai-assist/ to .gitignore? (y/n) [y]: " git_ignore_config
         if [[ "$git_ignore_config" != "n" && "$git_ignore_config" != "N" ]]; then
-            # Only add if not already present
             if ! grep -q ".git-ai-assist/" .gitignore 2>/dev/null; then
                 echo ".git-ai-assist/" >> .gitignore
             fi
@@ -197,7 +214,6 @@ check_project_initialized() {
     if [ ! -f "$CURRENT_CONFIG_FILE" ]; then
         die "Project not initialized. Run 'git-ai-assist init' first."
     fi
-    # Re-source project config to ensure variables are current
     source "$CURRENT_CONFIG_FILE"
     AUTO_COMMIT="${AUTO_COMMIT:-false}"
 }
@@ -207,25 +223,28 @@ check_project_initialized() {
 # ===========================
 see_alt() {
     check_project_initialized
-    
+
+    local tmp_file
+    tmp_file=$(mktemp)
+
+    local cleanup_see_alt
+    cleanup_see_alt() { rm -f "$tmp_file"; }
+    trap cleanup_see_alt EXIT
+
     local has_changes=false
-    
+
     if git diff --name-only HEAD 2>/dev/null | grep -q .; then
         has_changes=true
     fi
-    
+
     if [ "$has_changes" = false ] && git ls-files --others --exclude-standard 2>/dev/null | grep -q .; then
         has_changes=true
     fi
-    
+
     if [ "$has_changes" = false ]; then
         echo -e "${YELLOW}No changes detected in the repository. Nothing to show.${NC}" >&2
         return 0
     fi
-
-    local tmp_file
-    tmp_file=$(mktemp)
-    trap "rm -f '$tmp_file'" EXIT
 
     echo "# GIT STATUS" >> "$tmp_file"
     git status --short >> "$tmp_file"
@@ -242,7 +261,12 @@ see_alt() {
 
         echo "" >> "$tmp_file"
         echo "===== FILE: $file =====" >> "$tmp_file"
-        git diff HEAD -- "$file" >> "$tmp_file" 2>/dev/null || true
+        # Only get diff for tracked files
+        if git rev-parse --verify "HEAD:$file" &>/dev/null; then
+            git diff HEAD -- "$file" >> "$tmp_file" 2>/dev/null || true
+        else
+            echo "(file not tracked yet)" >> "$tmp_file"
+        fi
 
     done < <(git diff --name-only HEAD 2>/dev/null)
 
@@ -272,7 +296,15 @@ call_llm() {
     local http_code=""
     local tmp_response
     tmp_response=$(mktemp)
-    trap "rm -f '$tmp_response'" EXIT
+
+    local cleanup_llm
+    cleanup_llm() { rm -f "$tmp_response"; }
+    trap cleanup_llm EXIT
+
+    local escaped_prompt
+    escaped_prompt=$(json_escape "$prompt")
+
+    echo -e "${CYAN}Calling ${LLM_TYPE} (${LLM_MODEL})...${NC}" >&2
 
     http_code=$(curl -s -w "%{http_code}" -o "$tmp_response" \
         "$LLM_API_URL" \
@@ -280,14 +312,13 @@ call_llm() {
         -H "Authorization: Bearer $API_KEY" \
         -d "{
             \"model\": \"${LLM_MODEL}\",
-            \"messages\": [{\"role\": \"user\", \"content\": $(printf '%s' "$prompt" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))' 2>/dev/null || printf '"%s"' "$prompt")}],
+            \"messages\": [{\"role\": \"user\", \"content\": \"$escaped_prompt\"}],
             \"temperature\": ${DEFAULT_TEMPERATURE},
             \"max_tokens\": ${DEFAULT_MAX_TOKENS}
         }")
 
     response=$(cat "$tmp_response")
 
-    # Handle HTTP errors
     if [[ "$http_code" -ge 400 ]] 2>/dev/null; then
         echo -e "${RED}HTTP Error $http_code from API${NC}" >&2
         echo -e "${RED}Response: $response${NC}" >&2
@@ -424,7 +455,7 @@ Arquivos modificados importantes:
 
 Generate the report in the format above, without additional explanations or markdown."
 
-    echo -e "${CYAN}Generating daily report...${NC}"
+    echo -e "${CYAN}Generating daily report...${NC}" >&2
     local response
     response=$(call_llm "$prompt") || return 1
 
@@ -486,6 +517,17 @@ show_help() {
 main() {
     local version="1.0.0"
 
+    case "${1:-}" in
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        -v|--version)
+            echo "$version"
+            exit 0
+            ;;
+    esac
+
     # Check dependencies
     if ! command -v jq &>/dev/null; then
         die "jq is not installed. Install with: sudo apt install jq"
@@ -494,7 +536,6 @@ main() {
         die "curl is not installed. Install with: sudo apt install curl"
     fi
 
-    # Setup config first (needed for most commands)
     setup_config
 
     # No arguments → show help
@@ -508,37 +549,44 @@ main() {
             setup_project
             ;;
         commit)
-            commit
+            check_git_repository
+            check_project_initialized
+            changes=$(see_alt)
+            custom_note="${2:-}"
+            if [ -z "$custom_note" ]; then
+                echo -e "${YELLOW}Add a custom note? (y/n) [n]:${NC}" >&2
+                read -rp "" add_note
+                if [[ "$add_note" == "y" || "$add_note" == "Y" ]]; then
+                    read -rp "Your note: " custom_note
+                fi
+            fi
+            generate_commit_message "$changes" "${custom_note:-}"
             ;;
         gen-commit)
             check_git_repository
             changes=$(see_alt)
-            custom_note=""
-            if [ -n "${2:-}" ]; then
-                custom_note="$2"
-            else
-                echo -e "${YELLOW}Add a custom note? (y/n) [n]:${NC}"
+            custom_note="${2:-}"
+            if [ -z "$custom_note" ]; then
+                echo -e "${YELLOW}Add a custom note? (y/n) [n]:${NC}" >&2
                 read -rp "" add_note
                 if [[ "$add_note" == "y" || "$add_note" == "Y" ]]; then
                     read -rp "Your note: " custom_note
                 fi
             fi
-            generate_commit_message "$changes" "$custom_note"
+            generate_commit_message "$changes" "${custom_note:-}"
             ;;
         gen-report)
             check_git_repository
             changes=$(see_alt)
-            custom_note=""
-            if [ -n "${2:-}" ]; then
-                custom_note="$2"
-            else
-                echo -e "${YELLOW}Add a custom note? (y/n) [n]:${NC}"
+            custom_note="${2:-}"
+            if [ -z "$custom_note" ]; then
+                echo -e "${YELLOW}Add a custom note? (y/n) [n]:${NC}" >&2
                 read -rp "" add_note
                 if [[ "$add_note" == "y" || "$add_note" == "Y" ]]; then
                     read -rp "Your note: " custom_note
                 fi
             fi
-            generate_report "$changes" "$custom_note"
+            generate_report "$changes" "${custom_note:-}"
             ;;
         see-alt)
             see_alt
@@ -553,12 +601,6 @@ main() {
             else
                 info "No history found."
             fi
-            ;;
-        -h|--help)
-            show_help
-            ;;
-        -v|--version)
-            echo "$version"
             ;;
         *)
             die "Command '$1' not found. Run 'git-ai-assist --help' for usage."
