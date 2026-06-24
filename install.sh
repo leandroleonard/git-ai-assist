@@ -24,17 +24,17 @@ REPO_URL="https://github.com/leandroleonard/git-ai-assist"
 RAW_URL="https://raw.githubusercontent.com/leandroleonard/git-ai-assist/main"
 INSTALL_DIR="$HOME/.local/bin"
 SCRIPT_NAME="git-ai-assist"
-SCRIPT_URL="$RAW_URL/$SCRIPT_NAME.sh"
+SCRIPT_URL="$RAW_URL/git-ai-assist.sh"
 VERSION="1.0.0"
 
 # ===========================
 # Helpers
 # ===========================
-info()    { echo -e "${GREEN}✓${NC} $1"; }
-warn()    { echo -e "${YELLOW}⚠${NC} $1"; }
-error()   { echo -e "${RED}✗${NC} $1"; }
-step()    { echo -e "${BLUE}▸${NC} $1"; }
-success() { echo -e "\n${GREEN}═══════════════════════════════════════${NC}"; echo -e "${GREEN}  $1${NC}"; echo -e "${GREEN}═══════════════════════════════════════${NC}\n"; }
+info()    { echo -e "${GREEN}✓${NC} $1" >&2; }
+warn()    { echo -e "${YELLOW}⚠${NC} $1" >&2; }
+error()   { echo -e "${RED}✗${NC} $1" >&2; }
+step()    { echo -e "${BLUE}▸${NC} $1" >&2; }
+success() { echo -e "\n${GREEN}═══════════════════════════════════════${NC}" >&2; echo -e "${GREEN}  $1${NC}" >&2; echo -e "${GREEN}═══════════════════════════════════════${NC}\n" >&2; }
 
 die() {
     error "$1"
@@ -70,7 +70,7 @@ check_requirements() {
     if [[ $(echo "$bash_version 4.0" | awk '{if ($1 >= $2) print "ok"; else print "fail"}') != "ok" ]]; then
         warn "Bash version < 4.0 detected. Some features may not work."
     else
-        info "Bash $(bash --version | head -n1 | grep -oP '\d+\.\d+' | head -1) ✓"
+        info "Bash $bash_version ✓"
     fi
 
     # Check required commands
@@ -79,32 +79,32 @@ check_requirements() {
 
     for dep in "${deps[@]}"; do
         if command -v "$dep" &>/dev/null; then
-            info "$dep $(eval "$dep --version 2>/dev/null | head -n1 || echo 'installed'") ✓"
+            info "$dep installed ✓"
         else
             missing+=("$dep")
         fi
     done
 
     if [ ${#missing[@]} -gt 0 ]; then
-        echo ""
+        echo "" >&2
         warn "Missing dependencies: ${missing[*]}"
-        echo ""
+        echo "" >&2
 
         # Detect OS and suggest install command
         if command -v apt-get &>/dev/null; then
-            echo -e "  Install with: ${CYAN}sudo apt-get install -y ${missing[*]}${NC}"
+            echo -e "  Install with: ${CYAN}sudo apt-get install -y ${missing[*]}${NC}" >&2
         elif command -v dnf &>/dev/null; then
-            echo -e "  Install with: ${CYAN}sudo dnf install -y ${missing[*]}${NC}"
+            echo -e "  Install with: ${CYAN}sudo dnf install -y ${missing[*]}${NC}" >&2
         elif command -v yum &>/dev/null; then
-            echo -e "  Install with: ${CYAN}sudo yum install -y ${missing[*]}${NC}"
+            echo -e "  Install with: ${CYAN}sudo yum install -y ${missing[*]}${NC}" >&2
         elif command -v pacman &>/dev/null; then
-            echo -e "  Install with: ${CYAN}sudo pacman -S ${missing[*]}${NC}"
+            echo -e "  Install with: ${CYAN}sudo pacman -S ${missing[*]}${NC}" >&2
         elif command -v brew &>/dev/null; then
-            echo -e "  Install with: ${CYAN}brew install ${missing[*]}${NC}"
+            echo -e "  Install with: ${CYAN}brew install ${missing[*]}${NC}" >&2
         else
-            echo -e "  Please install: ${CYAN}${missing[*]}${NC}"
+            echo -e "  Please install: ${CYAN}${missing[*]}${NC}" >&2
         fi
-        echo ""
+        echo "" >&2
 
         read -rp "Do you want to install missing dependencies automatically? (y/n) [y]: " install_deps
         if [[ "$install_deps" != "n" && "$install_deps" != "N" ]]; then
@@ -136,34 +136,40 @@ download_script() {
     step "Downloading $SCRIPT_NAME from GitHub..."
 
     local tmp_file
-    tmp_file=$(mktemp)
+    tmp_file=$(mktemp /tmp/git-ai-assist.XXXXXX.sh)
 
     # Try curl first, fallback to wget
+    local download_ok=false
     if command -v curl &>/dev/null; then
-        if ! curl -fsSL --connect-timeout 10 --max-time 30 "$SCRIPT_URL" -o "$tmp_file" 2>/dev/null; then
-            # Try alternative URL (release)
-            if ! curl -fsSL --connect-timeout 10 --max-time 30 "$REPO_URL/releases/latest/download/$SCRIPT_NAME.sh" -o "$tmp_file" 2>/dev/null; then
-                die "Failed to download script. Check your internet connection and repository URL."
-            fi
+        if curl -fsSL --connect-timeout 10 --max-time 30 "$SCRIPT_URL" -o "$tmp_file" 2>/dev/null; then
+            download_ok=true
         fi
-    elif command -v wget &>/dev/null; then
-        if ! wget -q --timeout=10 -O "$tmp_file" "$SCRIPT_URL" 2>/dev/null; then
-            die "Failed to download script. Check your internet connection and repository URL."
+    fi
+
+    if [ "$download_ok" = false ] && command -v wget &>/dev/null; then
+        if wget -q --timeout=10 -O "$tmp_file" "$SCRIPT_URL" 2>/dev/null; then
+            download_ok=true
         fi
-    else
-        die "Neither curl nor wget is available."
+    fi
+
+    if [ "$download_ok" = false ]; then
+        rm -f "$tmp_file"
+        die "Failed to download script. Check your internet connection and repository URL: $SCRIPT_URL"
     fi
 
     # Verify downloaded file
     if [ ! -s "$tmp_file" ]; then
+        rm -f "$tmp_file"
         die "Downloaded file is empty."
     fi
 
     # Verify it looks like a bash script
     if ! head -n1 "$tmp_file" | grep -q '^#!/bin/bash'; then
+        rm -f "$tmp_file"
         die "Downloaded file is not a valid bash script."
     fi
 
+    # Return ONLY the file path (stdout)
     echo "$tmp_file"
 }
 
@@ -179,7 +185,9 @@ install_script() {
     mkdir -p "$INSTALL_DIR"
 
     # Move script to install location
-    mv "$script_file" "$INSTALL_DIR/$SCRIPT_NAME"
+    if ! mv "$script_file" "$INSTALL_DIR/$SCRIPT_NAME"; then
+        die "Failed to move script to $INSTALL_DIR/$SCRIPT_NAME"
+    fi
 
     # Make executable
     chmod +x "$INSTALL_DIR/$SCRIPT_NAME"
@@ -194,13 +202,13 @@ setup_path() {
     step "Checking PATH configuration..."
 
     # Check if install directory is already in PATH
-    if echo "$PATH" | grep -q "$INSTALL_DIR"; then
+    if echo "$PATH" | tr ':' '\n' | grep -q "^$INSTALL_DIR$"; then
         info "$INSTALL_DIR is already in PATH ✓"
         return 0
     fi
 
     warn "$INSTALL_DIR is not in your PATH"
-    echo ""
+    echo "" >&2
 
     # Detect shell
     local shell_name
@@ -231,7 +239,7 @@ setup_path() {
 
     if [ -z "$shell_rc" ]; then
         warn "Could not detect shell config file."
-        echo -e "  Please add manually: ${CYAN}export PATH=\"\$HOME/.local/bin:\$PATH\"${NC}"
+        echo -e "  Please add manually: ${CYAN}export PATH=\"\$HOME/.local/bin:\$PATH\"${NC}" >&2
         return 1
     fi
 
@@ -242,17 +250,11 @@ setup_path() {
         info "PATH already configured in $shell_rc ✓"
     else
         # Add to shell rc
-        echo "" >> "$shell_rc"
-        echo "# Added by git-ai-assist installer on $(date)" >> "$shell_rc"
-        
-        case "$shell_name" in
-            fish)
-                echo "fish_add_path $INSTALL_DIR" >> "$shell_rc"
-                ;;
-            *)
-                echo "export PATH=\"\$HOME/.local/bin:\$PATH\"" >> "$shell_rc"
-                ;;
-        esac
+        {
+            echo ""
+            echo "# Added by git-ai-assist installer on $(date)"
+            echo "export PATH=\"\$HOME/.local/bin:\$PATH\""
+        } >> "$shell_rc"
 
         info "PATH added to $shell_rc ✓"
     fi
@@ -283,46 +285,47 @@ verify_installation() {
 # Show next steps
 # ===========================
 show_next_steps() {
-    echo ""
-    success "git-ai-assist v$VERSION installed successfully!"
-    echo ""
-    echo -e "${BLUE}Next steps:${NC}"
-    echo ""
-    echo "  1. Initialize your project:"
-    echo -e "     ${CYAN}cd /seu/projeto${NC}"
-    echo -e "     ${CYAN}git-ai-assist init${NC}"
-    echo ""
-    echo "  2. Generate your first commit message:"
-    echo -e "     ${CYAN}git-ai-assist gen-commit${NC}"
-    echo ""
-    echo "  3. Generate a daily report:"
-    echo -e "     ${CYAN}git-ai-assist gen-report${NC}"
-    echo ""
-    echo "  4. View all commands:"
-    echo -e "     ${CYAN}git-ai-assist --help${NC}"
-    echo ""
-    echo -e "${YELLOW} Documentation: $REPO_URL${NC}"
-    echo ""
+    echo "" >&2
+    success "🎉 git-ai-assist v$VERSION installed successfully!"
+    echo -e "${BLUE}Next steps:${NC}" >&2
+    echo "" >&2
+    echo "  1. Initialize your project:" >&2
+    echo -e "     ${CYAN}cd /seu/projeto${NC}" >&2
+    echo -e "     ${CYAN}git-ai-assist init${NC}" >&2
+    echo "" >&2
+    echo "  2. Generate your first commit message:" >&2
+    echo -e "     ${CYAN}git-ai-assist gen-commit${NC}" >&2
+    echo "" >&2
+    echo "  3. Generate a daily report:" >&2
+    echo -e "     ${CYAN}git-ai-assist gen-report${NC}" >&2
+    echo "" >&2
+    echo "  4. View all commands:" >&2
+    echo -e "     ${CYAN}git-ai-assist --help${NC}" >&2
+    echo "" >&2
+    echo -e "${YELLOW}📖 Documentation: $REPO_URL${NC}" >&2
+    echo "" >&2
 }
 
 # ===========================
 # Main
 # ===========================
 main() {
-    echo ""
-    echo -e "${GREEN}╔═══════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║          Git AI Assistant Installer       ║${NC}"
-    echo -e "${GREEN}║           Version: $VERSION               ║${NC}"
-    echo -e "${GREEN}╚═══════════════════════════════════════════╝${NC}"
-    echo ""
+    echo "" >&2
+    echo -e "${GREEN}╔═══════════════════════════════════════════╗${NC}" >&2
+    echo -e "${GREEN}║     🤖  Git AI Assistant Installer       ║${NC}" >&2
+    echo -e "${GREEN}║           Version: $VERSION                  ║${NC}" >&2
+    echo -e "${GREEN}╚═══════════════════════════════════════════╝${NC}" >&2
+    echo "" >&2
 
     # Run installation steps
     check_existing
     check_requirements
 
+    # Download script (capture ONLY stdout)
     local script_file
-    script_file=$(download_script)
+    script_file=$(download_script 2>/dev/null)
 
+    # Install
     install_script "$script_file"
     setup_path
     verify_installation
@@ -331,14 +334,14 @@ main() {
 
 # Run with error handling
 main "$@" || {
-    echo ""
+    echo "" >&2
     error "Installation failed!"
-    echo ""
-    echo "Troubleshooting:"
-    echo "  - Check your internet connection"
-    echo "  - Verify repository URL: $REPO_URL"
-    echo "  - Check permissions: $INSTALL_DIR"
-    echo "  - Manual install: See $REPO_URL/blob/main/README.md"
-    echo ""
+    echo "" >&2
+    echo "Troubleshooting:" >&2
+    echo "  - Check your internet connection" >&2
+    echo "  - Verify repository URL: $REPO_URL" >&2
+    echo "  - Check permissions: $INSTALL_DIR" >&2
+    echo "  - Manual install: See $REPO_URL/blob/main/README.md" >&2
+    echo "" >&2
     exit 1
 }
