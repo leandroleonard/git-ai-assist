@@ -25,7 +25,7 @@ RAW_URL="https://raw.githubusercontent.com/leandroleonard/git-ai-assist/main"
 INSTALL_DIR="$HOME/.local/bin"
 SCRIPT_NAME="git-ai-assist"
 SCRIPT_URL="$RAW_URL/git-ai-assist.sh"
-VERSION="1.0.0"
+VERSION="1.0.1"
 
 # ===========================
 # Helpers
@@ -286,7 +286,7 @@ verify_installation() {
 # ===========================
 show_next_steps() {
     echo "" >&2
-    success "🎉 git-ai-assist v$VERSION installed successfully!"
+    success "git-ai-assist v$VERSION installed successfully!"
     echo -e "${BLUE}Next steps:${NC}" >&2
     echo "" >&2
     echo "  1. Initialize your project:" >&2
@@ -302,7 +302,7 @@ show_next_steps() {
     echo "  4. View all commands:" >&2
     echo -e "     ${CYAN}git-ai-assist --help${NC}" >&2
     echo "" >&2
-    echo -e "${YELLOW}📖 Documentation: $REPO_URL${NC}" >&2
+    echo -e "${YELLOW}Documentation: $REPO_URL${NC}" >&2
     echo "" >&2
 }
 
@@ -312,7 +312,7 @@ show_next_steps() {
 main() {
     echo "" >&2
     echo -e "${GREEN}╔═══════════════════════════════════════════╗${NC}" >&2
-    echo -e "${GREEN}║     🤖  Git AI Assistant Installer       ║${NC}" >&2
+    echo -e "${GREEN}║        Git AI Assistant Installer         ║${NC}" >&2
     echo -e "${GREEN}║           Version: $VERSION                  ║${NC}" >&2
     echo -e "${GREEN}╚═══════════════════════════════════════════╝${NC}" >&2
     echo "" >&2
