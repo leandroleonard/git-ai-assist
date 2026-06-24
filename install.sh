@@ -284,7 +284,7 @@ verify_installation() {
 # ===========================
 show_next_steps() {
     echo ""
-    success "🎉 git-ai-assist v$VERSION installed successfully!"
+    success "git-ai-assist v$VERSION installed successfully!"
     echo ""
     echo -e "${BLUE}Next steps:${NC}"
     echo ""
@@ -301,7 +301,7 @@ show_next_steps() {
     echo "  4. View all commands:"
     echo -e "     ${CYAN}git-ai-assist --help${NC}"
     echo ""
-    echo -e "${YELLOW}📖 Documentation: $REPO_URL${NC}"
+    echo -e "${YELLOW} Documentation: $REPO_URL${NC}"
     echo ""
 }
 
@@ -311,8 +311,8 @@ show_next_steps() {
 main() {
     echo ""
     echo -e "${GREEN}╔═══════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║     🤖  Git AI Assistant Installer       ║${NC}"
-    echo -e "${GREEN}║           Version: $VERSION                  ║${NC}"
+    echo -e "${GREEN}║          Git AI Assistant Installer       ║${NC}"
+    echo -e "${GREEN}║           Version: $VERSION               ║${NC}"
     echo -e "${GREEN}╚═══════════════════════════════════════════╝${NC}"
     echo ""
 
