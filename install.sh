@@ -25,7 +25,7 @@ RAW_URL="https://raw.githubusercontent.com/leandroleonard/git-ai-assist/main"
 INSTALL_DIR="$HOME/.local/bin"
 SCRIPT_NAME="git-ai-assist"
 SCRIPT_URL="$RAW_URL/git-ai-assist.sh"
-VERSION="1.0.1"
+VERSION="1.0.6"
 
 # ===========================
 # Helpers

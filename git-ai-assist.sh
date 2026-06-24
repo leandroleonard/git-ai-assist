@@ -2,7 +2,7 @@
 
 # ~/bin/git-ai-assist.sh
 # Git AI Assistant - Automação Inteligente para Git
-# Version: 1.0.5
+# Version: 1.0.6
 # License: MIT
 
 set -euo pipefail
@@ -515,7 +515,7 @@ show_help() {
 # Main
 # ===========================
 main() {
-    local version="1.0.5"
+    local version="1.0.6"
 
     case "${1:-}" in
         -h|--help)
