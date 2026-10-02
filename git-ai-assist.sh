@@ -227,10 +227,6 @@ see_alt() {
     local tmp_file
     tmp_file=$(mktemp)
 
-    local cleanup_see_alt
-    cleanup_see_alt() { rm -f "$tmp_file"; }
-    trap cleanup_see_alt EXIT
-
     local has_changes=false
 
     if git diff --name-only HEAD 2>/dev/null | grep -q .; then
@@ -243,6 +239,7 @@ see_alt() {
 
     if [ "$has_changes" = false ]; then
         echo -e "${YELLOW}No changes detected in the repository. Nothing to show.${NC}" >&2
+        rm -f "$tmp_file"
         return 0
     fi
 
@@ -261,7 +258,7 @@ see_alt() {
 
         echo "" >> "$tmp_file"
         echo "===== FILE: $file =====" >> "$tmp_file"
-        # Only get diff for tracked files
+
         if git rev-parse --verify "HEAD:$file" &>/dev/null; then
             git diff HEAD -- "$file" >> "$tmp_file" 2>/dev/null || true
         else
@@ -285,6 +282,8 @@ see_alt() {
     done < <(git ls-files --others --exclude-standard 2>/dev/null)
 
     cat "$tmp_file"
+
+    rm -f "$tmp_file"
 }
 
 # ===========================
@@ -296,10 +295,6 @@ call_llm() {
     local http_code=""
     local tmp_response
     tmp_response=$(mktemp)
-
-    local cleanup_llm
-    cleanup_llm() { rm -f "$tmp_response"; }
-    trap cleanup_llm EXIT
 
     local escaped_prompt
     escaped_prompt=$(json_escape "$prompt")
@@ -319,13 +314,14 @@ call_llm() {
 
     response=$(cat "$tmp_response")
 
+    rm -f "$tmp_response"
+
     if [[ "$http_code" -ge 400 ]] 2>/dev/null; then
         echo -e "${RED}HTTP Error $http_code from API${NC}" >&2
         echo -e "${RED}Response: $response${NC}" >&2
         return 1
     fi
 
-    # Extract message content using jq
     local content
     content=$(echo "$response" | jq -r '.choices[0].message.content' 2>/dev/null)
 
